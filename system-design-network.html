@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>System Design — Knowledge Network</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #070b12;
+    --bg2:       #0d1320;
+    --grid:      rgba(255,255,255,0.03);
+    --c-found:   #00e5ff;
+    --c-scale:   #00ff8c;
+    --c-store:   #ff8c00;
+    --c-rely:    #ff3d71;
+    --c-comm:    #b48eff;
+    --c-arch:    #ffe066;
+    --c-ref:     #8ecfff;
+    --text:      #e8f0fe;
+    --muted:     #4a5568;
+    --mono:      'Space Mono', monospace;
+    --sans:      'Syne', sans-serif;
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    overflow: hidden;
+  }
+
+  /* ── grid background ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── vignette ── */
+  body::after {
+    content: '';
+    position: fixed; inset: 0;
+    background: radial-gradient(ellipse at center, transparent 40%, var(--bg) 100%);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* ── header ── */
+  header {
+    position: fixed; top: 0; left: 0; right: 0;
+    z-index: 100;
+    padding: 18px 28px;
+    display: flex; align-items: center; justify-content: space-between;
+    background: linear-gradient(to bottom, rgba(7,11,18,0.95) 0%, transparent 100%);
+    backdrop-filter: blur(4px);
+  }
+  header h1 {
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text);
+    opacity: 0.8;
+  }
+  header .badge {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  /* ── legend ── */
+  .legend {
+    position: fixed; bottom: 24px; left: 24px;
+    z-index: 100;
+    background: rgba(13,19,32,0.85);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 10px;
+    padding: 14px 16px;
+    backdrop-filter: blur(8px);
+  }
+  .legend-title {
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 6px;
+    font-size: 10px;
+    color: rgba(232,240,254,0.7);
+    letter-spacing: 0.05em;
+  }
+  .legend-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* ── hint ── */
+  .hint {
+    position: fixed; bottom: 24px; right: 24px;
+    z-index: 100;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-align: right;
+    line-height: 1.8;
+  }
+
+  /* ── SVG canvas ── */
+  #graph {
+    position: fixed; inset: 0;
+    z-index: 2;
+    cursor: grab;
+  }
+  #graph:active { cursor: grabbing; }
+
+  /* ── edges ── */
+  .link {
+    stroke: rgba(255,255,255,0.08);
+    stroke-width: 1.2;
+    fill: none;
+    transition: stroke 0.3s, stroke-width 0.3s;
+  }
+  .link.highlighted {
+    stroke-width: 2;
+    stroke-opacity: 0.7;
+  }
+
+  /* ── nodes ── */
+  .node-group { cursor: pointer; }
+  .node-group:hover .node-ring { animation: pulse-ring 1.2s ease-out infinite; }
+
+  .node-outer {
+    fill: none;
+    stroke-width: 1;
+    opacity: 0.3;
+  }
+  .node-inner {
+    stroke: none;
+  }
+  .node-ring {
+    fill: none;
+    stroke-width: 1;
+    opacity: 0;
+  }
+
+  @keyframes pulse-ring {
+    0%   { r: 18px; opacity: 0.6; }
+    100% { r: 34px; opacity: 0; }
+  }
+
+  /* ── labels ── */
+  .node-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    fill: rgba(232,240,254,0.55);
+    text-anchor: middle;
+    pointer-events: none;
+    letter-spacing: 0.04em;
+    transition: fill 0.2s;
+  }
+  .node-group:hover .node-label { fill: rgba(232,240,254,0.95); }
+
+  /* ── tooltip ── */
+  #tooltip {
+    position: fixed;
+    z-index: 200;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+  }
+  #tooltip.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .tooltip-inner {
+    background: rgba(13,19,32,0.97);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px;
+    padding: 10px 14px;
+    max-width: 210px;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+  }
+  .tooltip-category {
+    font-size: 8px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .tooltip-title {
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.3;
+    margin-bottom: 6px;
+  }
+  .tooltip-connections {
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+  }
+  .tooltip-cta {
+    margin-top: 8px;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    opacity: 0.5;
+  }
+
+  /* ── click flash ── */
+  @keyframes click-flash {
+    0%   { opacity: 1; r: 16px; }
+    100% { opacity: 0; r: 42px; }
+  }
+  .click-flash {
+    fill: none;
+    stroke-width: 2;
+    animation: click-flash 0.5s ease-out forwards;
+  }
+
+  /* ── ambient glow blobs ── */
+  .ambient {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(80px);
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.04;
+  }
+  .a1 { width:500px; height:500px; background:#00e5ff; top:-100px; left:-100px; }
+  .a2 { width:400px; height:400px; background:#b48eff; bottom:-80px; right:-80px; }
+</style>
+</head>
+<body>
+
+<div class="ambient a1"></div>
+<div class="ambient a2"></div>
+
+<header>
+  <h1>🧠 System Design — Knowledge Network</h1>
+  <span class="badge">16 Nodes · 45+ Connections</span>
+</header>
+
+<svg id="graph"></svg>
+
+<div id="tooltip">
+  <div class="tooltip-inner">
+    <div class="tooltip-category" id="tt-category"></div>
+    <div class="tooltip-title" id="tt-title"></div>
+    <div class="tooltip-connections" id="tt-connections"></div>
+    <div class="tooltip-cta">↗ Click to open in Notion</div>
+  </div>
+</div>
+
+<div class="legend">
+  <div class="legend-title">Categories</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#00e5ff;box-shadow:0 0 6px #00e5ff"></div>Foundations</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#00ff8c;box-shadow:0 0 6px #00ff8c"></div>Scalability</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#ff8c00;box-shadow:0 0 6px #ff8c00"></div>Storage</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#ff3d71;box-shadow:0 0 6px #ff3d71"></div>Reliability</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#b48eff;box-shadow:0 0 6px #b48eff"></div>Communication</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#ffe066;box-shadow:0 0 6px #ffe066"></div>Architecture</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#8ecfff;box-shadow:0 0 6px #8ecfff"></div>Reference</div>
+</div>
+
+<div class="hint">
+  Drag to reposition nodes<br>
+  Scroll to zoom<br>
+  Click a node to open Notion
+</div>
+
+<script>
+const CATEGORY_COLOR = {
+  Foundations:   '#00e5ff',
+  Scalability:   '#00ff8c',
+  Storage:       '#ff8c00',
+  Reliability:   '#ff3d71',
+  Communication: '#b48eff',
+  Architecture:  '#ffe066',
+  Reference:     '#8ecfff',
+};
+
+const nodes = [
+  { id: 0,  label: 'What Is\nSystem Design?',  short: 'What Is SD?',           category: 'Foundations',   difficulty: 'Beginner',     url: 'https://www.notion.so/33e443bad5c88175a3ffc7d3dab32d28' },
+  { id: 1,  label: 'The Three\nPillars',        short: 'Three Pillars',         category: 'Foundations',   difficulty: 'Beginner',     url: 'https://www.notion.so/33e443bad5c88139aad4dcd8a9c66cf3' },
+  { id: 2,  label: 'Core Concepts\n& Chars.',   short: 'Core Concepts',         category: 'Foundations',   difficulty: 'Beginner',     url: 'https://www.notion.so/33e443bad5c881ffa065dc3d2d8815ca' },
+  { id: 3,  label: 'CAP\nTheorem',              short: 'CAP Theorem',           category: 'Foundations',   difficulty: 'Intermediate', url: 'https://www.notion.so/33e443bad5c881589974ccac9dd634aa' },
+  { id: 4,  label: 'Scalability\nStrategies',   short: 'Scalability',           category: 'Scalability',   difficulty: 'Intermediate', url: 'https://www.notion.so/33e443bad5c881819500f6a94561ea81' },
+  { id: 5,  label: 'Databases\n& Storage',      short: 'Databases',             category: 'Storage',       difficulty: 'Intermediate', url: 'https://www.notion.so/33e443bad5c8816f9a05da505464c873' },
+  { id: 6,  label: 'Caching',                   short: 'Caching',               category: 'Storage',       difficulty: 'Intermediate', url: 'https://www.notion.so/33e443bad5c8813ba478ea0409bd0e25' },
+  { id: 7,  label: 'Load\nBalancing',           short: 'Load Balancing',        category: 'Scalability',   difficulty: 'Intermediate', url: 'https://www.notion.so/33e443bad5c88144a73ceaa9baad63f5' },
+  { id: 8,  label: 'Protocols\n& APIs',         short: 'Protocols & APIs',      category: 'Communication', difficulty: 'Intermediate', url: 'https://www.notion.so/33e443bad5c881acb673d9de807383c5' },
+  { id: 9,  label: 'Message\nQueues',           short: 'Message Queues',        category: 'Communication', difficulty: 'Advanced',     url: 'https://www.notion.so/33e443bad5c8811fa2dec4c1607267b4' },
+  { id: 10, label: 'Architecture\nPatterns',    short: 'Architecture',          category: 'Architecture',  difficulty: 'Advanced',     url: 'https://www.notion.so/33e443bad5c88190b145ffedd00869a4' },
+  { id: 11, label: 'High Avail.\n& Fault Tol.', short: 'HA & Fault Tolerance',  category: 'Reliability',   difficulty: 'Advanced',     url: 'https://www.notion.so/33e443bad5c881f987ceddaec078baea' },
+  { id: 12, label: 'CDN &\nNetworking',         short: 'CDN & Networking',      category: 'Communication', difficulty: 'Intermediate', url: 'https://www.notion.so/33e443bad5c881d6a4ece9fd2dcba9e2' },
+  { id: 13, label: '7-Step\nFramework',         short: '7-Step Framework',      category: 'Reference',     difficulty: 'Beginner',     url: 'https://www.notion.so/33e443bad5c881d88afed9b62e7bf28b' },
+  { id: 14, label: 'Trade-Offs\nCheat Sheet',   short: 'Trade-Offs',            category: 'Reference',     difficulty: 'Intermediate', url: 'https://www.notion.so/33e443bad5c8812e9f62d8da62edd691' },
+  { id: 15, label: 'Recommended\nResources',    short: 'Resources',             category: 'Reference',     difficulty: 'Beginner',     url: 'https://www.notion.so/33e443bad5c8816b9c67c4bc589f72e1' },
+];
+
+// Deduplicated edges
+const edgesRaw = [
+  [0,1],[0,2],[0,13],[0,15],
+  [1,2],[1,4],[1,11],[1,14],
+  [2,3],[2,5],[2,14],
+  [3,5],[3,4],[3,11],[3,14],
+  [4,7],[4,5],[4,6],[4,12],
+  [5,6],[5,4],[5,2],
+  [6,7],[6,12],[6,4],
+  [7,11],[7,12],[7,4],
+  [8,9],[8,10],[8,12],
+  [9,10],[9,4],[9,11],
+  [10,4],[10,11],[10,14],
+  [11,7],[11,4],[11,3],[11,5],
+  [12,6],[12,7],[12,8],
+  [13,14],[13,15],[13,0],
+  [14,3],[14,5],[14,10],[14,2],
+  [15,13],[15,0],
+];
+
+// Deduplicate
+const edgeSet = new Set();
+const links = edgesRaw.filter(([s,t]) => {
+  const key = s < t ? `${s}-${t}` : `${t}-${s}`;
+  if (edgeSet.has(key)) return false;
+  edgeSet.add(key);
+  return true;
+}).map(([source, target]) => ({ source, target }));
+
+// Build adjacency for tooltip
+const adjacency = {};
+nodes.forEach(n => adjacency[n.id] = []);
+links.forEach(l => {
+  adjacency[l.source].push(l.target);
+  adjacency[l.target].push(l.source);
+});
+
+// ── D3 setup ──────────────────────────────────────────
+const svg = d3.select('#graph');
+const W = window.innerWidth, H = window.innerHeight;
+svg.attr('width', W).attr('height', H);
+
+const g = svg.append('g');
+
+// Zoom
+const zoom = d3.zoom()
+  .scaleExtent([0.25, 3])
+  .on('zoom', e => g.attr('transform', e.transform));
+svg.call(zoom);
+
+// Defs: glow filters + arrowhead
+const defs = svg.append('defs');
+Object.entries(CATEGORY_COLOR).forEach(([cat, color]) => {
+  const f = defs.append('filter').attr('id', `glow-${cat.toLowerCase()}`);
+  f.append('feGaussianBlur').attr('stdDeviation', '3.5').attr('result', 'coloredBlur');
+  const fM = f.append('feMerge');
+  fM.append('feMergeNode').attr('in', 'coloredBlur');
+  fM.append('feMergeNode').attr('in', 'SourceGraphic');
+});
+
+// Force simulation
+const sim = d3.forceSimulation(nodes)
+  .force('link', d3.forceLink(links).id(d => d.id).distance(130).strength(0.4))
+  .force('charge', d3.forceManyBody().strength(-420))
+  .force('center', d3.forceCenter(W / 2, H / 2))
+  .force('collision', d3.forceCollide(45));
+
+// Draw links
+const linkEls = g.append('g').selectAll('line')
+  .data(links).enter().append('line')
+  .attr('class', 'link');
+
+// Draw nodes
+const nodeGroups = g.append('g').selectAll('.node-group')
+  .data(nodes).enter().append('g')
+  .attr('class', 'node-group')
+  .call(d3.drag()
+    .on('start', (event, d) => { if (!event.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+    .on('drag',  (event, d) => { d.fx = event.x; d.fy = event.y; })
+    .on('end',   (event, d) => { if (!event.active) sim.alphaTarget(0); d.fx = null; d.fy = null; })
+  );
+
+// Outer ring (halo)
+nodeGroups.append('circle')
+  .attr('class', 'node-outer')
+  .attr('r', 20)
+  .attr('stroke', d => CATEGORY_COLOR[d.category]);
+
+// Pulse ring (animated on hover)
+nodeGroups.append('circle')
+  .attr('class', 'node-ring')
+  .attr('r', 18)
+  .attr('stroke', d => CATEGORY_COLOR[d.category]);
+
+// Main circle
+nodeGroups.append('circle')
+  .attr('class', 'node-inner')
+  .attr('r', 14)
+  .attr('fill', d => {
+    const c = CATEGORY_COLOR[d.category];
+    return `${c}22`;
+  })
+  .attr('stroke', d => CATEGORY_COLOR[d.category])
+  .attr('stroke-width', 1.5)
+  .style('filter', d => `url(#glow-${d.category.toLowerCase()})`);
+
+// Category icon / initial
+nodeGroups.append('text')
+  .attr('class', 'node-icon')
+  .attr('text-anchor', 'middle')
+  .attr('dominant-baseline', 'middle')
+  .attr('y', 0)
+  .style('font-size', '11px')
+  .style('fill', d => CATEGORY_COLOR[d.category])
+  .style('font-family', 'monospace')
+  .style('pointer-events', 'none')
+  .text(d => {
+    const icons = {
+      Foundations: '◈', Scalability: '⬡', Storage: '⬢',
+      Reliability: '◉', Communication: '◎', Architecture: '◆', Reference: '◇'
+    };
+    return icons[d.category] || '●';
+  });
+
+// Label (two-line)
+nodeGroups.each(function(d) {
+  const group = d3.select(this);
+  const lines = d.label.split('\n');
+  const labelG = group.append('g').attr('class', 'label-g').attr('transform', 'translate(0, 22)');
+  lines.forEach((line, i) => {
+    labelG.append('text')
+      .attr('class', 'node-label')
+      .attr('y', i * 12)
+      .text(line);
+  });
+});
+
+// ── Tooltip ──────────────────────────────────────────
+const tooltip = document.getElementById('tooltip');
+const ttCategory = document.getElementById('tt-category');
+const ttTitle = document.getElementById('tt-title');
+const ttConnections = document.getElementById('tt-connections');
+
+nodeGroups
+  .on('mouseenter', function(event, d) {
+    // Highlight connected links
+    linkEls
+      .classed('highlighted', l =>
+        l.source.id === d.id || l.target.id === d.id
+      )
+      .style('stroke', l => {
+        if (l.source.id === d.id || l.target.id === d.id) {
+          return CATEGORY_COLOR[d.category];
+        }
+        return null;
+      });
+
+    // Dim unconnected nodes
+    const connected = new Set(adjacency[d.id]);
+    connected.add(d.id);
+    nodeGroups.style('opacity', n => connected.has(n.id) ? 1 : 0.2);
+
+    // Tooltip content
+    const color = CATEGORY_COLOR[d.category];
+    ttCategory.textContent = d.category;
+    ttCategory.style.color = color;
+    ttTitle.textContent = d.short;
+    ttTitle.style.color = color;
+    const connectedNames = adjacency[d.id].map(id => nodes[id].short).join(', ');
+    ttConnections.textContent = `Connected to: ${connectedNames}`;
+
+    tooltip.classList.add('visible');
+  })
+  .on('mousemove', function(event) {
+    const pad = 14;
+    let x = event.clientX + pad;
+    let y = event.clientY - 10;
+    const tw = 220;
+    if (x + tw > window.innerWidth) x = event.clientX - tw - pad;
+    tooltip.style.left = x + 'px';
+    tooltip.style.top  = y + 'px';
+  })
+  .on('mouseleave', function() {
+    linkEls.classed('highlighted', false).style('stroke', null);
+    nodeGroups.style('opacity', 1);
+    tooltip.classList.remove('visible');
+  })
+  .on('click', function(event, d) {
+    event.stopPropagation();
+    // Flash effect
+    const group = d3.select(this);
+    const color = CATEGORY_COLOR[d.category];
+    group.append('circle')
+      .attr('class', 'click-flash')
+      .attr('r', 16)
+      .attr('stroke', color)
+      .on('animationend', function() { this.remove(); });
+    // Open Notion
+    window.open(d.url, '_blank');
+  });
+
+// ── Simulation tick ───────────────────────────────────
+sim.on('tick', () => {
+  linkEls
+    .attr('x1', d => d.source.x)
+    .attr('y1', d => d.source.y)
+    .attr('x2', d => d.target.x)
+    .attr('y2', d => d.target.y);
+
+  nodeGroups
+    .attr('transform', d => `translate(${d.x},${d.y})`);
+});
+
+// ── Resize ────────────────────────────────────────────
+window.addEventListener('resize', () => {
+  const W = window.innerWidth, H = window.innerHeight;
+  svg.attr('width', W).attr('height', H);
+  sim.force('center', d3.forceCenter(W / 2, H / 2)).alpha(0.3).restart();
+});
+
+// ── Initial zoom-to-fit after settle ─────────────────
+sim.on('end', () => {
+  const bbox = g.node().getBBox();
+  const pad = 60;
+  const scale = Math.min(
+    (W - pad * 2) / bbox.width,
+    (H - pad * 2) / bbox.height,
+    1.1
+  );
+  const tx = (W - scale * (bbox.x * 2 + bbox.width)) / 2;
+  const ty = (H - scale * (bbox.y * 2 + bbox.height)) / 2;
+  svg.transition().duration(800).ease(d3.easeCubicInOut)
+    .call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(scale));
+});
+</script>
+</body>
+</html>
