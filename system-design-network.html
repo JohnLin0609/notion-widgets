@@ -7,189 +7,619 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
-  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-  :root{
-    --bg:#070b12;--grid:rgba(255,255,255,0.025);
-    --text:#e8f0fe;--muted:#4a5568;
-    --mono:'Space Mono',monospace;--sans:'Syne',sans-serif;
-  }
-  html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-family:var(--mono);overflow:hidden}
-  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:48px 48px;pointer-events:none;z-index:0}
-  body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at center,transparent 35%,rgba(7,11,18,0.85) 100%);pointer-events:none;z-index:1}
-  .legend{position:fixed;bottom:20px;left:20px;z-index:100;background:rgba(13,19,32,0.88);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:14px 18px;backdrop-filter:blur(10px)}
-  .legend-title{font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
-  .legend-item{display:flex;align-items:center;gap:9px;margin-bottom:7px;font-size:11px;color:rgba(232,240,254,.75)}
-  .legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
-  .hint{position:fixed;bottom:20px;right:20px;z-index:100;font-size:10px;color:var(--muted);letter-spacing:.1em;text-align:right;line-height:2}
-  #graph{position:fixed;inset:0;z-index:2;cursor:grab}
-  #graph:active{cursor:grabbing}
-  .link{stroke:rgba(255,255,255,0.07);stroke-width:1.5;fill:none;transition:stroke .25s,stroke-width .25s,stroke-opacity .25s}
-  .link.active{stroke-width:3;stroke-opacity:.9}
-  .link.dimmed{stroke-opacity:.015}
-  .node-group{cursor:pointer}
-  .node-halo{fill:none;stroke-width:1;opacity:.12;transition:opacity .25s}
-  .node-group:hover .node-halo{opacity:.5}
-  .node-body{stroke-width:2.5;transition:filter .2s}
-  .node-group:hover .node-body{filter:brightness(1.5) !important}
-  .node-icon{pointer-events:none;dominant-baseline:middle;text-anchor:middle}
-  .node-label{font-family:var(--mono);fill:rgba(232,240,254,.45);text-anchor:middle;pointer-events:none;letter-spacing:.03em;transition:fill .2s}
-  .node-group:hover .node-label{fill:rgba(232,240,254,1)}
-  .node-group.dimmed{opacity:.07}
-  @keyframes pulse{0%{r:22px;opacity:.55}100%{r:50px;opacity:0}}
-  .pulse-ring{fill:none;stroke-width:1.5;opacity:0;pointer-events:none}
-  .node-group:hover .pulse-ring{animation:pulse 1.5s ease-out infinite}
-  #tooltip{position:fixed;z-index:300;pointer-events:none;opacity:0;transform:translateY(8px);transition:opacity .15s,transform .15s}
-  #tooltip.show{opacity:1;transform:translateY(0)}
-  .tt-box{background:rgba(8,13,22,.97);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:14px 18px;max-width:240px;box-shadow:0 16px 48px rgba(0,0,0,.75);backdrop-filter:blur(20px)}
-  .tt-cat{font-size:8px;letter-spacing:.2em;text-transform:uppercase;margin-bottom:4px}
-  .tt-name{font-family:var(--sans);font-size:16px;font-weight:800;line-height:1.25;margin-bottom:6px}
-  .tt-diff{font-size:9px;opacity:.45;margin-bottom:8px;letter-spacing:.1em}
-  .tt-conn{font-size:9px;color:var(--muted);line-height:1.7}
-  .tt-cta{margin-top:10px;font-size:9px;letter-spacing:.12em;text-transform:uppercase;opacity:.35}
-  .blob{position:fixed;border-radius:50%;filter:blur(100px);pointer-events:none;z-index:0;opacity:.035;animation:float 14s ease-in-out infinite}
-  .b1{width:600px;height:600px;background:#00e5ff;top:-150px;left:-150px}
-  .b2{width:500px;height:500px;background:#b48eff;bottom:-120px;right:-120px;animation-delay:-7s}
-  @keyframes float{0%,100%{transform:translate(0,0)}50%{transform:translate(18px,14px)}}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#06090f;--bg2:#0d1420;--bg3:#111827;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
+  --text:#e8f0fe;--muted:#556070;--muted2:#8899aa;
+  --mono:'Space Mono',monospace;--sans:'Syne',sans-serif;
+  --panel-w:310px;--topbar:54px;
+}
+html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-family:var(--mono);overflow:hidden}
+body::before{content:'';position:fixed;inset:0;
+  background-image:linear-gradient(rgba(255,255,255,0.016) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(255,255,255,0.016) 1px,transparent 1px);
+  background-size:44px 44px;pointer-events:none;z-index:0}
+
+/* ── TOP BAR ── */
+#topbar{position:fixed;top:0;left:0;right:0;height:var(--topbar);z-index:200;
+  display:flex;align-items:center;gap:10px;padding:0 14px;
+  background:rgba(6,9,15,0.94);border-bottom:1px solid var(--border);
+  backdrop-filter:blur(14px)}
+#logo{font-family:var(--sans);font-size:13px;font-weight:800;letter-spacing:.05em;
+  white-space:nowrap;color:var(--text);opacity:.85;flex-shrink:0}
+#logo span{font-size:9px;font-weight:400;opacity:.38;display:block;letter-spacing:.15em;
+  text-transform:uppercase;margin-top:1px}
+#search-wrap{position:relative;flex:1;max-width:260px}
+#search{width:100%;background:var(--bg3);border:1px solid var(--border);
+  border-radius:6px;padding:7px 30px 7px 30px;font-family:var(--mono);font-size:11px;
+  color:var(--text);outline:none;transition:border .2s}
+#search:focus{border-color:var(--border2)}
+#search::placeholder{color:var(--muted)}
+#si{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:11px;opacity:.3;pointer-events:none}
+#sc{position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:10px;
+  opacity:.3;cursor:pointer;display:none;color:var(--text)}
+#sc:hover{opacity:.8}
+#cat-filters{display:flex;gap:4px;flex-wrap:nowrap;overflow:hidden;flex:1}
+.cat-btn{font-family:var(--mono);font-size:8px;letter-spacing:.07em;
+  padding:4px 7px;border-radius:4px;cursor:pointer;border:1px solid transparent;
+  transition:all .2s;white-space:nowrap;display:flex;align-items:center;gap:4px}
+.cat-btn.active{opacity:1}
+.cat-btn.inactive{opacity:.2}
+.cat-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+#counter{font-size:9px;color:var(--muted);letter-spacing:.1em;white-space:nowrap;flex-shrink:0}
+
+/* ── GRAPH ── */
+#graph{position:fixed;inset:0;top:var(--topbar);z-index:2;cursor:grab}
+#graph:active{cursor:grabbing}
+
+/* ── ZOOM CONTROLS ── */
+#zoom-ctrl{position:fixed;bottom:20px;right:20px;z-index:100;display:flex;flex-direction:column;gap:4px}
+.z-btn{width:32px;height:32px;background:var(--bg2);border:1px solid var(--border);
+  border-radius:6px;display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:14px;color:var(--muted2);transition:all .15s;font-family:var(--mono)}
+.z-btn:hover{background:var(--bg3);color:var(--text);border-color:var(--border2)}
+
+/* ── LEGEND ── */
+#legend{position:fixed;bottom:20px;left:20px;z-index:100;
+  background:rgba(10,15,24,0.9);border:1px solid var(--border);
+  border-radius:10px;padding:12px 14px;backdrop-filter:blur(10px)}
+.leg-title{font-size:8px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.leg-row{display:flex;align-items:center;gap:7px;margin-bottom:5px;font-size:10px;color:rgba(232,240,254,.6)}
+.leg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+
+/* ── HINT ── */
+#hint{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+  z-index:100;font-size:9px;color:var(--muted);letter-spacing:.1em;text-align:center;line-height:1.9}
+
+/* ── SIDE PANEL ── */
+#panel{position:fixed;top:var(--topbar);right:-330px;bottom:0;width:var(--panel-w);
+  background:rgba(8,12,20,0.97);border-left:1px solid var(--border);
+  z-index:150;backdrop-filter:blur(18px);
+  transition:right .3s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;overflow:hidden}
+#panel.open{right:0}
+#panel-close{position:absolute;top:12px;right:12px;width:28px;height:28px;
+  background:var(--bg3);border:1px solid var(--border);border-radius:6px;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:12px;color:var(--muted2);transition:all .15s}
+#panel-close:hover{color:var(--text);border-color:var(--border2)}
+#panel-cat{font-size:8px;letter-spacing:.2em;text-transform:uppercase;margin-bottom:7px}
+#panel-name{font-family:var(--sans);font-size:19px;font-weight:800;line-height:1.25;margin-bottom:7px}
+#panel-diff{font-size:8px;letter-spacing:.12em;text-transform:uppercase;
+  padding:3px 8px;border-radius:3px;display:inline-block;margin-bottom:14px}
+#panel-diff.Beginner{background:rgba(0,255,140,.1);color:#00ff8c}
+#panel-diff.Intermediate{background:rgba(255,224,102,.1);color:#ffe066}
+#panel-diff.Advanced{background:rgba(255,61,113,.1);color:#ff3d71}
+#panel-desc{font-size:11px;line-height:1.75;color:var(--muted2);margin-bottom:18px}
+#panel-connections h4{font-size:8px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:9px}
+.conn-item{display:flex;align-items:center;gap:8px;padding:7px 10px;margin-bottom:4px;
+  background:var(--bg3);border:1px solid var(--border);border-radius:6px;
+  cursor:pointer;transition:all .15s;font-size:10px;color:var(--muted2)}
+.conn-item:hover{border-color:var(--border2);color:var(--text);transform:translateX(3px)}
+.conn-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.conn-arrow{font-size:10px;opacity:.4}
+#panel-body{padding:22px 16px;flex:1;overflow-y:auto}
+#panel-footer{padding:12px 16px;border-top:1px solid var(--border)}
+#panel-cta{display:block;width:100%;padding:10px;text-align:center;
+  background:transparent;border:1px solid var(--border2);border-radius:6px;
+  font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--text);cursor:pointer;text-decoration:none;transition:all .2s}
+#panel-cta:hover{background:var(--bg3);border-color:rgba(255,255,255,.22)}
+
+/* ── TOOLTIP ── */
+#tooltip{position:fixed;z-index:300;pointer-events:none;
+  opacity:0;transform:translateY(6px);transition:opacity .12s,transform .12s}
+#tooltip.show{opacity:1;transform:translateY(0)}
+.tt-inner{background:rgba(8,12,20,0.97);border:1px solid var(--border2);
+  border-radius:9px;padding:11px 14px;max-width:210px;
+  box-shadow:0 12px 40px rgba(0,0,0,.75);backdrop-filter:blur(18px)}
+.tt-cat{font-size:8px;letter-spacing:.18em;text-transform:uppercase;margin-bottom:3px}
+.tt-name{font-family:var(--sans);font-size:13px;font-weight:800;line-height:1.25;margin-bottom:4px}
+.tt-meta{font-size:9px;color:var(--muted);letter-spacing:.05em}
+.tt-cta{margin-top:6px;font-size:8px;letter-spacing:.12em;text-transform:uppercase;opacity:.35}
+
+/* ── GRAPH ELEMENTS ── */
+.link{fill:none;stroke:rgba(255,255,255,.055);stroke-width:1.4;
+  transition:stroke .2s,stroke-width .2s,stroke-opacity .2s}
+.link.active{stroke-width:2.8;stroke-opacity:.85}
+.link.dimmed{stroke-opacity:.01}
+.node-group{cursor:pointer}
+.node-halo{fill:none;stroke-width:1;opacity:.1;transition:opacity .2s}
+.node-group:hover .node-halo,.node-group.selected .node-halo{opacity:.5}
+@keyframes pulse{0%{r:var(--pr,18px);opacity:.55}100%{r:var(--pr2,46px);opacity:0}}
+.pulse-ring{fill:none;stroke-width:1.5;opacity:0;pointer-events:none}
+.node-group:hover .pulse-ring,.node-group.selected .pulse-ring{animation:pulse 1.6s ease-out infinite}
+.node-body{stroke-width:2.2;transition:filter .2s}
+.node-group:hover .node-body,.node-group.selected .node-body{filter:brightness(1.6) !important}
+.node-icon{pointer-events:none;dominant-baseline:middle;text-anchor:middle}
+.node-label{font-family:var(--mono);fill:rgba(232,240,254,.4);text-anchor:middle;
+  pointer-events:none;letter-spacing:.03em;transition:fill .2s}
+.node-group:hover .node-label,.node-group.selected .node-label{fill:rgba(232,240,254,1)}
+.node-group.dimmed{opacity:.06;pointer-events:none}
+.pin-indicator{font-size:8px;pointer-events:none;text-anchor:middle;fill:rgba(255,255,255,.5)}
+
+/* ── AMBIENT ── */
+.blob{position:fixed;border-radius:50%;filter:blur(110px);pointer-events:none;
+  z-index:0;opacity:.03;animation:bfloat 16s ease-in-out infinite}
+.b1{width:700px;height:700px;background:#00e5ff;top:-200px;left:-200px}
+.b2{width:500px;height:500px;background:#b48eff;bottom:-150px;right:-150px;animation-delay:-8s}
+.b3{width:400px;height:400px;background:#ff6b9d;top:40%;right:30%;animation-delay:-4s}
+@keyframes bfloat{0%,100%{transform:translate(0,0)}50%{transform:translate(20px,15px)}}
+#panel-body::-webkit-scrollbar{width:4px}
+#panel-body::-webkit-scrollbar-track{background:transparent}
+#panel-body::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
 </style>
 </head>
 <body>
-<div class="blob b1"></div>
-<div class="blob b2"></div>
+<div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+
+<div id="topbar">
+  <div id="logo">System Design<span>Knowledge Network</span></div>
+  <div id="search-wrap">
+    <span id="si">⌕</span>
+    <input id="search" type="text" placeholder="Search 27 concepts…" autocomplete="off">
+    <span id="sc">✕</span>
+  </div>
+  <div id="cat-filters"></div>
+  <div id="counter">27 nodes</div>
+</div>
+
 <svg id="graph"></svg>
+
+<div id="panel">
+  <div id="panel-close" title="Close (Esc)">✕</div>
+  <div id="panel-body">
+    <div id="panel-cat"></div>
+    <div id="panel-name"></div>
+    <div id="panel-diff"></div>
+    <div id="panel-desc"></div>
+    <div id="panel-connections"><h4>Connected Concepts</h4><div id="panel-conn-list"></div></div>
+  </div>
+  <div id="panel-footer"><a id="panel-cta" href="#" target="_blank">↗ Open in Notion</a></div>
+</div>
+
 <div id="tooltip">
-  <div class="tt-box">
+  <div class="tt-inner">
     <div class="tt-cat" id="tt-cat"></div>
     <div class="tt-name" id="tt-name"></div>
-    <div class="tt-diff" id="tt-diff"></div>
-    <div class="tt-conn" id="tt-conn"></div>
-    <div class="tt-cta">↗ Click to open in Notion</div>
+    <div class="tt-meta" id="tt-meta"></div>
+    <div class="tt-cta">Click to explore ↗</div>
   </div>
 </div>
-<div class="legend">
-  <div class="legend-title">Categories</div>
-  <div class="legend-item"><div class="legend-dot" style="background:#00e5ff;box-shadow:0 0 8px #00e5ff55"></div>Foundations</div>
-  <div class="legend-item"><div class="legend-dot" style="background:#00ff8c;box-shadow:0 0 8px #00ff8c55"></div>Scalability</div>
-  <div class="legend-item"><div class="legend-dot" style="background:#ff8c00;box-shadow:0 0 8px #ff8c0055"></div>Storage</div>
-  <div class="legend-item"><div class="legend-dot" style="background:#ff3d71;box-shadow:0 0 8px #ff3d7155"></div>Reliability</div>
-  <div class="legend-item"><div class="legend-dot" style="background:#b48eff;box-shadow:0 0 8px #b48eff55"></div>Communication</div>
-  <div class="legend-item"><div class="legend-dot" style="background:#ffe066;box-shadow:0 0 8px #ffe06655"></div>Architecture</div>
-  <div class="legend-item"><div class="legend-dot" style="background:#8ecfff;box-shadow:0 0 8px #8ecfff55"></div>Reference</div>
-</div>
-<div class="hint">Drag · Scroll to zoom · Hover · Click to open</div>
-<script>
-const CC={Foundations:'#00e5ff',Scalability:'#00ff8c',Storage:'#ff8c00',Reliability:'#ff3d71',Communication:'#b48eff',Architecture:'#ffe066',Reference:'#8ecfff'};
-const CI={Foundations:'◈',Scalability:'⬡',Storage:'⬢',Reliability:'◉',Communication:'◎',Architecture:'◆',Reference:'◇'};
-const nodes=[
-  {id:0,name:'What Is System Design?',short:'What Is SD?',cat:'Foundations',diff:'Beginner',url:'https://www.notion.so/33e443bad5c88175a3ffc7d3dab32d28'},
-  {id:1,name:'The Three Pillars',short:'Three Pillars',cat:'Foundations',diff:'Beginner',url:'https://www.notion.so/33e443bad5c88139aad4dcd8a9c66cf3'},
-  {id:2,name:'Core Concepts & Characteristics',short:'Core Concepts',cat:'Foundations',diff:'Beginner',url:'https://www.notion.so/33e443bad5c881ffa065dc3d2d8815ca'},
-  {id:3,name:'CAP Theorem',short:'CAP Theorem',cat:'Foundations',diff:'Intermediate',url:'https://www.notion.so/33e443bad5c881589974ccac9dd634aa'},
-  {id:4,name:'Scalability Strategies',short:'Scalability',cat:'Scalability',diff:'Intermediate',url:'https://www.notion.so/33e443bad5c881819500f6a94561ea81'},
-  {id:5,name:'Databases & Storage',short:'Databases',cat:'Storage',diff:'Intermediate',url:'https://www.notion.so/33e443bad5c8816f9a05da505464c873'},
-  {id:6,name:'Caching',short:'Caching',cat:'Storage',diff:'Intermediate',url:'https://www.notion.so/33e443bad5c8813ba478ea0409bd0e25'},
-  {id:7,name:'Load Balancing',short:'Load Balancing',cat:'Scalability',diff:'Intermediate',url:'https://www.notion.so/33e443bad5c88144a73ceaa9baad63f5'},
-  {id:8,name:'Communication Protocols & APIs',short:'Protocols & APIs',cat:'Communication',diff:'Intermediate',url:'https://www.notion.so/33e443bad5c881acb673d9de807383c5'},
-  {id:9,name:'Message Queues & EDA',short:'Message Queues',cat:'Communication',diff:'Advanced',url:'https://www.notion.so/33e443bad5c8811fa2dec4c1607267b4'},
-  {id:10,name:'Architecture Patterns',short:'Architecture',cat:'Architecture',diff:'Advanced',url:'https://www.notion.so/33e443bad5c88190b145ffedd00869a4'},
-  {id:11,name:'High Availability & Fault Tolerance',short:'HA & Fault Tol.',cat:'Reliability',diff:'Advanced',url:'https://www.notion.so/33e443bad5c881f987ceddaec078baea'},
-  {id:12,name:'CDN & Networking',short:'CDN & Networking',cat:'Communication',diff:'Intermediate',url:'https://www.notion.so/33e443bad5c881d6a4ece9fd2dcba9e2'},
-  {id:13,name:'The 7-Step Interview Framework',short:'7-Step Framework',cat:'Reference',diff:'Beginner',url:'https://www.notion.so/33e443bad5c881d88afed9b62e7bf28b'},
-  {id:14,name:'Key Trade-Offs Cheat Sheet',short:'Trade-Offs',cat:'Reference',diff:'Intermediate',url:'https://www.notion.so/33e443bad5c8812e9f62d8da62edd691'},
-  {id:15,name:'Recommended Resources',short:'Resources',cat:'Reference',diff:'Beginner',url:'https://www.notion.so/33e443bad5c8816b9c67c4bc589f72e1'},
-];
-const edgeList=[[0,1],[0,2],[0,13],[0,15],[1,2],[1,4],[1,11],[1,14],[2,3],[2,5],[2,14],[3,5],[3,4],[3,11],[3,14],[4,7],[4,5],[4,6],[4,12],[5,6],[6,7],[6,12],[7,11],[7,12],[8,9],[8,10],[8,12],[9,10],[9,4],[9,11],[10,4],[10,11],[10,14],[11,7],[11,3],[11,5],[12,8],[13,14],[13,15],[14,3],[14,5],[14,10],[14,2]];
-const seen=new Set();
-const links=edgeList.filter(([s,t])=>{const k=s<t?`${s}-${t}`:`${t}-${s}`;if(seen.has(k))return false;seen.add(k);return true}).map(([source,target])=>({source,target}));
-const adj={};nodes.forEach(n=>adj[n.id]=[]);
-links.forEach(l=>{adj[l.source].push(l.target);adj[l.target].push(l.source);});
 
+<div id="legend">
+  <div class="leg-title">Categories</div>
+  <div class="leg-row"><div class="leg-dot" style="background:#00e5ff"></div>Foundations</div>
+  <div class="leg-row"><div class="leg-dot" style="background:#00ff8c"></div>Scalability</div>
+  <div class="leg-row"><div class="leg-dot" style="background:#ff9040"></div>Storage</div>
+  <div class="leg-row"><div class="leg-dot" style="background:#ff3d71"></div>Reliability</div>
+  <div class="leg-row"><div class="leg-dot" style="background:#b48eff"></div>Communication</div>
+  <div class="leg-row"><div class="leg-dot" style="background:#ffe066"></div>Architecture</div>
+  <div class="leg-row"><div class="leg-dot" style="background:#8ecfff"></div>Reference</div>
+  <div class="leg-row"><div class="leg-dot" style="background:#ff6b9d"></div>Security</div>
+  <div class="leg-row"><div class="leg-dot" style="background:#4ecdc4"></div>Infrastructure</div>
+  <div class="leg-row"><div class="leg-dot" style="background:#74b9ff"></div>Data</div>
+</div>
+
+<div id="zoom-ctrl">
+  <div class="z-btn" id="z-in" title="Zoom in (+)">+</div>
+  <div class="z-btn" id="z-fit" title="Fit (F)" style="font-size:10px">⊡</div>
+  <div class="z-btn" id="z-out" title="Zoom out (-)">−</div>
+</div>
+
+<div id="hint">Drag · Scroll zoom · Hover preview · Click to explore · Double-click to pin</div>
+
+<script>
+const CC={
+  Foundations:'#00e5ff',Scalability:'#00ff8c',Storage:'#ff9040',
+  Reliability:'#ff3d71',Communication:'#b48eff',Architecture:'#ffe066',
+  Reference:'#8ecfff',Security:'#ff6b9d',Infrastructure:'#4ecdc4',Data:'#74b9ff'
+};
+const CI={
+  Foundations:'◈',Scalability:'⬡',Storage:'⬢',Reliability:'◉',
+  Communication:'◎',Architecture:'◆',Reference:'◇',Security:'⬡',
+  Infrastructure:'⬣',Data:'◐'
+};
+const CATS=Object.keys(CC);
+
+const nodes=[
+  {id:0,name:'What Is System Design?',short:'What Is SD?',cat:'Foundations',diff:'Beginner',
+   desc:'The blueprint phase of software — defining architecture, components, data flows, and interfaces to meet functional and non-functional requirements at scale.',
+   url:'https://www.notion.so/33e443bad5c88175a3ffc7d3dab32d28'},
+  {id:1,name:'The Three Pillars',short:'Three Pillars',cat:'Foundations',diff:'Beginner',
+   desc:'Performance (latency & throughput), Scalability (vertical vs horizontal), and Reliability & Availability (uptime targets) — every design balances these three.',
+   url:'https://www.notion.so/33e443bad5c88139aad4dcd8a9c66cf3'},
+  {id:2,name:'Core Concepts & Characteristics',short:'Core Concepts',cat:'Foundations',diff:'Beginner',
+   desc:'Latency vs throughput, consistency models (strong/eventual/causal), ACID vs BASE, stateless vs stateful, idempotency, rate limiting algorithms.',
+   url:'https://www.notion.so/33e443bad5c881ffa065dc3d2d8815ca'},
+  {id:3,name:'CAP Theorem',short:'CAP Theorem',cat:'Foundations',diff:'Intermediate',
+   desc:'In any distributed system, only 2 of 3 are possible: Consistency, Availability, Partition Tolerance. Since P is unavoidable, the real choice is CP vs AP. Also covers PACELC.',
+   url:'https://www.notion.so/33e443bad5c881589974ccac9dd634aa'},
+  {id:4,name:'Scalability Strategies',short:'Scalability',cat:'Scalability',diff:'Intermediate',
+   desc:'Vertical vs horizontal scaling, database sharding (range/hash/directory), consistent hashing, primary-replica and multi-primary replication, connection pooling, denormalization.',
+   url:'https://www.notion.so/33e443bad5c881819500f6a94561ea81'},
+  {id:5,name:'Databases & Storage',short:'Databases',cat:'Storage',diff:'Intermediate',
+   desc:'SQL vs NoSQL trade-offs. Deep dives on PostgreSQL, MongoDB, Cassandra, Redis, DynamoDB, Neo4j. Indexing strategies (B-tree, hash, covering), normalization vs denormalization.',
+   url:'https://www.notion.so/33e443bad5c8816f9a05da505464c873'},
+  {id:6,name:'Caching',short:'Caching',cat:'Storage',diff:'Intermediate',
+   desc:'All cache levels (L1 to CDN), 4 strategies (cache-aside, write-through, write-behind, read-through), eviction policies (LRU/LFU/TTL), Redis deep dive, stampede/poisoning/cold-start pitfalls.',
+   url:'https://www.notion.so/33e443bad5c8813ba478ea0409bd0e25'},
+  {id:7,name:'Load Balancing',short:'Load Balancing',cat:'Scalability',diff:'Intermediate',
+   desc:'6 algorithms (Round Robin, Weighted, Least Connections, IP Hash, etc.), L4 vs L7 balancing with routing examples, health checks, sticky sessions, global load balancing strategies.',
+   url:'https://www.notion.so/33e443bad5c88144a73ceaa9baad63f5'},
+  {id:8,name:'Communication Protocols & APIs',short:'Protocols & APIs',cat:'Communication',diff:'Intermediate',
+   desc:'REST, GraphQL, gRPC, WebSocket, SSE compared. OSI model, TCP vs UDP, API Gateway pattern with auth/rate limiting/routing. Long polling.',
+   url:'https://www.notion.so/33e443bad5c881acb673d9de807383c5'},
+  {id:9,name:'Message Queues & Event-Driven Architecture',short:'Message Queues',cat:'Communication',diff:'Advanced',
+   desc:'Kafka internals (partitions, offsets, consumer groups, delivery guarantees), RabbitMQ exchanges, SQS FIFO, Event Sourcing, CQRS, Pub/Sub patterns.',
+   url:'https://www.notion.so/33e443bad5c8811fa2dec4c1607267b4'},
+  {id:10,name:'Architecture Patterns',short:'Architecture',cat:'Architecture',diff:'Advanced',
+   desc:'Monolith vs Microservices comparison, Strangler Fig migration, Serverless, Service Mesh, Saga Pattern (choreography vs orchestration), SOLID applied to distributed systems.',
+   url:'https://www.notion.so/33e443bad5c88190b145ffedd00869a4'},
+  {id:11,name:'High Availability & Fault Tolerance',short:'HA & Fault Tol.',cat:'Reliability',diff:'Advanced',
+   desc:'Redundancy, replication, failover modes (active-active vs active-passive), Circuit Breaker (3 states), Retry with exponential backoff + jitter, Rate Limiting, Bulkhead, Graceful Degradation, SLI/SLO/SLA.',
+   url:'https://www.notion.so/33e443bad5c881f987ceddaec078baea'},
+  {id:12,name:'CDN & Networking',short:'CDN & Networking',cat:'Communication',diff:'Intermediate',
+   desc:'CDN edge caching, Cache-Control headers, major providers, DNS record types and DNS-based load balancing, TCP vs UDP deep dive, QUIC/HTTP/3, network latency components.',
+   url:'https://www.notion.so/33e443bad5c881d6a4ece9fd2dcba9e2'},
+  {id:13,name:'The 7-Step Interview Framework',short:'7-Step Framework',cat:'Reference',diff:'Beginner',
+   desc:'Clarify → Estimate Scale → Define APIs → High-level Architecture → Deep Dive → Non-functionals → Trade-offs. Time allocation, scale estimation formulas, common interview mistakes.',
+   url:'https://www.notion.so/33e443bad5c881d88afed9b62e7bf28b'},
+  {id:14,name:'Key Trade-Offs Cheat Sheet',short:'Trade-Offs',cat:'Reference',diff:'Intermediate',
+   desc:'Master trade-off table (11 decisions), database selection matrix, CAP decision matrix, scalability decision tree, availability quick reference, numbers every engineer should know.',
+   url:'https://www.notion.so/33e443bad5c8812e9f62d8da62edd691'},
+  {id:15,name:'Recommended Resources',short:'Resources',cat:'Reference',diff:'Beginner',
+   desc:'5 ranked books (Kleppmann, Alex Xu, Newman, Google SRE), courses (ByteByteGo, Hello Interview, Educative), 10 engineering blogs, 8-week study plan.',
+   url:'https://www.notion.so/33e443bad5c8816b9c67c4bc589f72e1'},
+  {id:16,name:'Security & Authentication',short:'Security & Auth',cat:'Security',diff:'Advanced',
+   desc:'AuthN vs AuthZ, password hashing (bcrypt/Argon2), MFA, SSO (SAML/OIDC), OAuth 2.0 flows, JWT (structure/risks/refresh tokens), RBAC/ABAC, TLS/mTLS, AES-256, KMS, OWASP top vulnerabilities.',
+   url:'https://www.notion.so/33e443bad5c881359a27d3cc6f8ba0de'},
+  {id:17,name:'Observability & Monitoring',short:'Observability',cat:'Infrastructure',diff:'Intermediate',
+   desc:'Three pillars: Logs (structured JSON, ELK/Loki), Metrics (counters/gauges/histograms, Four Golden Signals, Prometheus/Grafana), Traces (spans/trace IDs, Jaeger/Zipkin/OpenTelemetry). SLI/SLO/Error Budget.',
+   url:'https://www.notion.so/33e443bad5c881d9aca6fb19be6cffb6'},
+  {id:18,name:'Distributed Systems Fundamentals',short:'Dist. Systems',cat:'Foundations',diff:'Advanced',
+   desc:'8 fallacies of distributed computing, Raft vs Paxos consensus, Byzantine Fault Tolerance, leader election, distributed locks (Redis SETNX/Redlock, etcd), vector clocks, 2PC, gossip protocol, TrueTime/HLC.',
+   url:'https://www.notion.so/33e443bad5c88158a57ee97dce644196'},
+  {id:19,name:'Containers & Orchestration',short:'Containers & K8s',cat:'Infrastructure',diff:'Intermediate',
+   desc:'Docker (images, layers, multi-stage builds), Kubernetes (pods, deployments, services, ingress, HPA, StatefulSet), CI/CD pipelines, blue-green/canary/rolling deployments, Helm, Terraform, ArgoCD.',
+   url:'https://www.notion.so/33e443bad5c881e993ffcca98376a63c'},
+  {id:20,name:'Data Processing & Pipelines',short:'Data Pipelines',cat:'Data',diff:'Advanced',
+   desc:'Batch (Hadoop MapReduce, Apache Spark) vs Stream (Apache Flink, Kafka Streams), Lambda vs Kappa architecture, ETL vs ELT, Airflow/Prefect orchestration, dbt, Debezium CDC, Airbyte.',
+   url:'https://www.notion.so/33e443bad5c8815c83b1ef8c91eba444'},
+  {id:21,name:'Search Systems',short:'Search Systems',cat:'Data',diff:'Intermediate',
+   desc:'Inverted index, text analysis pipeline (tokenization/stemming/synonyms), Elasticsearch deep dive (shards, mappings, BM25 scoring), autocomplete, faceted search, fuzzy search, geospatial search, sync strategies.',
+   url:'https://www.notion.so/33e443bad5c881e0a84dd098678d1137'},
+  {id:22,name:'Storage Systems & Data Warehouses',short:'Data Warehouses',cat:'Data',diff:'Intermediate',
+   desc:'Object storage (AWS S3 tiers, presigned URLs), OLTP vs OLAP, columnar storage, BigQuery/Snowflake/Redshift/Databricks comparison, Data Lake vs Lakehouse, Parquet/Iceberg/Delta Lake, Unique ID generation (Snowflake ID, ULID, UUID).',
+   url:'https://www.notion.so/33e443bad5c881789ef8d61be92ecfab'},
+  {id:23,name:'Real-World System Designs',short:'Case Studies',cat:'Reference',diff:'Intermediate',
+   desc:'URL shortener (hash collision, 302 vs 301), Twitter feed (fan-out on write vs read, hybrid), YouTube (HLS transcoding pipeline, ABR), Uber (geohash matching, surge pricing), WhatsApp (WebSocket fanout), Google Maps (routing algorithms, live traffic).',
+   url:'https://www.notion.so/33e443bad5c881ed9748fbda7763073e'},
+  {id:24,name:'Geospatial Systems',short:'Geospatial',cat:'Architecture',diff:'Advanced',
+   desc:'Geohash (prefix-based proximity, 9 neighboring cells), Quadtree (adaptive density), S2 Geometry (Hilbert curve), PostGIS (ST_DWithin, GIST index), Redis Geo commands, H3 hexagonal indexing (Uber), proximity search architecture.',
+   url:'https://www.notion.so/33e443bad5c881d4b742e0bda2f6f121'},
+  {id:25,name:'Service Mesh & Coordination',short:'Service Mesh',cat:'Infrastructure',diff:'Advanced',
+   desc:'Istio/Linkerd/Envoy (data plane vs control plane, mTLS, traffic splitting), API Gateways (Kong, Traefik, Nginx, AWS API Gateway), Zookeeper (ephemeral nodes, watches), etcd (Raft-based K8s brain), Consul (service discovery, health checks, KV).',
+   url:'https://www.notion.so/33e443bad5c8818cb542dca58aa302c6'},
+  {id:26,name:'Official Tools Reference',short:'Tools Reference',cat:'Reference',diff:'Intermediate',
+   desc:'Master reference: 10 message brokers (Kafka, RabbitMQ, SQS, NATS, Pulsar...), 16 NoSQL + 6 SQL databases, 8 caching tools, 8 load balancers, 13 data pipeline tools, 13 monitoring tools, 6 CDN providers, 7 search engines, 8 security/identity tools.',
+   url:'https://www.notion.so/33e443bad5c881d6beb9ef275f42f9d6'},
+];
+
+// All edges (undirected, deduplicated)
+const edgeList=[
+  // Original foundations cluster
+  [0,1],[0,2],[0,13],[0,15],
+  [1,2],[1,4],[1,11],[1,14],
+  [2,3],[2,5],[2,14],[2,16],
+  [3,4],[3,5],[3,11],[3,14],[3,18],
+  // Scalability cluster
+  [4,5],[4,6],[4,7],[4,12],[4,18],[4,21],[4,22],[4,23],
+  // Storage cluster
+  [5,6],[5,21],[5,22],
+  [6,7],[6,12],
+  // Scalability-Reliability
+  [7,11],[7,12],
+  // Communication cluster
+  [8,9],[8,10],[8,12],[8,16],[8,24],[8,25],
+  [9,10],[9,11],[9,20],
+  // Architecture-Reliability
+  [10,11],[10,14],[10,19],[10,25],
+  // HA cluster
+  [11,17],[11,18],[11,25],
+  // CDN
+  [12,6],
+  // Reference cluster
+  [13,14],[13,15],[13,23],
+  [14,10],
+  // Security cluster
+  [16,11],[16,17],[16,25],
+  // Observability
+  [17,19],[17,25],[17,26],
+  // Distributed Systems
+  [18,5],[18,25],
+  // Containers
+  [19,25],[19,26],
+  // Data cluster
+  [20,9],[20,21],[20,22],[20,19],[20,26],
+  [21,22],[21,26],
+  [22,26],
+  // Case Studies
+  [23,14],[23,24],[23,26],
+  // Geospatial
+  [24,5],[24,26],
+  // Service Mesh
+  [25,26],
+  // Tools Reference
+  [15,26],
+];
+
+// Deduplicate
+const seen=new Set();
+const links=edgeList.filter(([s,t])=>{
+  const k=s<t?`${s}-${t}`:`${t}-${s}`;
+  if(seen.has(k))return false;seen.add(k);return true;
+}).map(([source,target])=>({source,target}));
+
+// Adjacency + degree
+const adj={};nodes.forEach(n=>{adj[n.id]=[]});
+links.forEach(l=>{adj[l.source].push(l.target);adj[l.target].push(l.source)});
+nodes.forEach(n=>{n.degree=adj[n.id].length});
+const maxDeg=Math.max(...nodes.map(n=>n.degree));
+
+function nodeR(d){return 13+((d.degree/maxDeg)*11)}
+function haloR(d){return nodeR(d)+16}
+
+// ── STATE ──────────────────────────────────────────────────────────────
+let selectedId=null,panelOpen=false;
+let activeCategories=new Set(CATS),searchTerm='';
+
+// ── SVG ────────────────────────────────────────────────────────────────
 const svg=d3.select('#graph');
-let W=window.innerWidth,H=window.innerHeight;
+let W=window.innerWidth,H=window.innerHeight-54;
 svg.attr('width',W).attr('height',H);
 const g=svg.append('g');
+
+// Glow filters
 const defs=svg.append('defs');
 Object.entries(CC).forEach(([cat,col])=>{
-  const f=defs.append('filter').attr('id',`g-${cat}`).attr('x','-60%').attr('y','-60%').attr('width','220%').attr('height','220%');
-  f.append('feGaussianBlur').attr('stdDeviation','6').attr('result','b');
-  const m=f.append('feMerge');m.append('feMergeNode').attr('in','b');m.append('feMergeNode').attr('in','SourceGraphic');
+  const f=defs.append('filter').attr('id',`gw-${cat}`).attr('x','-80%').attr('y','-80%').attr('width','260%').attr('height','260%');
+  f.append('feGaussianBlur').attr('stdDeviation','5.5').attr('result','b');
+  const m=f.append('feMerge');
+  m.append('feMergeNode').attr('in','b');m.append('feMergeNode').attr('in','SourceGraphic');
 });
-const zoom=d3.zoom().scaleExtent([0.15,5]).on('zoom',e=>g.attr('transform',e.transform));
-svg.call(zoom);
+
+// Zoom
+const zoom=d3.zoom().scaleExtent([0.08,5]).on('zoom',e=>g.attr('transform',e.transform));
+svg.call(zoom).on('dblclick.zoom',null);
+
+// Simulation
 const sim=d3.forceSimulation(nodes)
-  .force('link',d3.forceLink(links).id(d=>d.id).distance(220).strength(0.3))
-  .force('charge',d3.forceManyBody().strength(-900))
+  .force('link',d3.forceLink(links).id(d=>d.id).distance(d=>{
+    const sr=nodeR(nodes[typeof d.source==='object'?d.source.id:d.source]);
+    const tr=nodeR(nodes[typeof d.target==='object'?d.target.id:d.target]);
+    return 175+sr+tr;
+  }).strength(0.25))
+  .force('charge',d3.forceManyBody().strength(d=>-650-d.degree*38))
   .force('center',d3.forceCenter(W/2,H/2))
-  .force('collision',d3.forceCollide(65));
-const linkEls=g.append('g').selectAll('line').data(links).enter().append('line').attr('class','link');
-const nodeG=g.append('g').selectAll('.node-group').data(nodes).enter().append('g').attr('class','node-group')
+  .force('collision',d3.forceCollide(d=>haloR(d)+10));
+
+// Links
+const linkEls=g.append('g').selectAll('path').data(links).enter().append('path').attr('class','link');
+
+// Nodes
+const nodeG=g.append('g').selectAll('.node-group').data(nodes).enter()
+  .append('g').attr('class','node-group').style('opacity',0)
   .call(d3.drag()
-    .on('start',(e,d)=>{if(!e.active)sim.alphaTarget(0.3).restart();d.fx=d.x;d.fy=d.y;})
-    .on('drag',(e,d)=>{d.fx=e.x;d.fy=e.y;})
-    .on('end',(e,d)=>{if(!e.active)sim.alphaTarget(0);d.fx=null;d.fy=null;})
+    .on('start',(e,d)=>{if(!e.active)sim.alphaTarget(0.3).restart();d.fx=d.x;d.fy=d.y})
+    .on('drag',(e,d)=>{d.fx=e.x;d.fy=e.y})
+    .on('end',(e,d)=>{if(!e.active)sim.alphaTarget(0);if(!d.pinned){d.fx=null;d.fy=null}})
   );
-nodeG.append('circle').attr('class','node-halo').attr('r',38).attr('stroke',d=>CC[d.cat]);
-nodeG.append('circle').attr('class','pulse-ring').attr('r',22).attr('stroke',d=>CC[d.cat]);
-nodeG.append('circle').attr('class','node-body').attr('r',22)
-  .attr('fill',d=>CC[d.cat]+'22').attr('stroke',d=>CC[d.cat])
-  .style('filter',d=>`url(#g-${d.cat})`);
-nodeG.append('text').attr('class','node-icon').attr('y',0).style('font-size','14px')
+
+nodeG.append('circle').attr('class','node-halo').attr('r',d=>haloR(d)).attr('stroke',d=>CC[d.cat]);
+nodeG.append('circle').attr('class','pulse-ring').attr('r',d=>nodeR(d)).attr('stroke',d=>CC[d.cat]);
+nodeG.append('circle').attr('class','node-body').attr('r',d=>nodeR(d))
+  .attr('fill',d=>CC[d.cat]+'18').attr('stroke',d=>CC[d.cat])
+  .style('filter',d=>`url(#gw-${d.cat})`);
+nodeG.append('text').attr('class','node-icon').attr('y',0)
+  .style('font-size',d=>`${Math.round(nodeR(d)*0.65)}px`)
   .style('fill',d=>CC[d.cat]).text(d=>CI[d.cat]);
+nodeG.append('text').attr('class','pin-indicator').attr('y',d=>-nodeR(d)-5).text('');
 nodeG.each(function(d){
-  const words=d.short.split(' ');
-  const mid=Math.ceil(words.length/2);
-  const lines=[words.slice(0,mid).join(' '),words.slice(mid).join(' ')].filter(Boolean);
-  const lg=d3.select(this).append('g').attr('transform','translate(0,32)');
-  lines.forEach((ln,i)=>lg.append('text').attr('class','node-label').attr('y',i*13).style('font-size','10px').text(ln));
+  const w=d.short.split(' '),mid=Math.ceil(w.length/2);
+  const lines=[w.slice(0,mid).join(' '),w.slice(mid).join(' ')].filter(Boolean);
+  const lg=d3.select(this).append('g').attr('transform',`translate(0,${nodeR(d)+13})`);
+  lines.forEach((ln,i)=>lg.append('text').attr('class','node-label').attr('y',i*12).style('font-size','9px').text(ln));
 });
+
+// Entrance animation
+nodeG.transition().delay((d,i)=>i*30).duration(500).style('opacity',1);
+
+// ── TICK ───────────────────────────────────────────────────────────────
+sim.on('tick',()=>{
+  linkEls.attr('d',d=>{
+    const dx=d.target.x-d.source.x,dy=d.target.y-d.source.y;
+    const dr=Math.sqrt(dx*dx+dy*dy)*0.55;
+    return `M${d.source.x},${d.source.y}A${dr},${dr} 0 0,1 ${d.target.x},${d.target.y}`;
+  });
+  nodeG.attr('transform',d=>`translate(${d.x},${d.y})`);
+});
+sim.on('end',fitScreen);
+
+// ── TOOLTIP ────────────────────────────────────────────────────────────
 const tip=document.getElementById('tooltip');
-const ttCat=document.getElementById('tt-cat'),ttName=document.getElementById('tt-name'),ttDiff=document.getElementById('tt-diff'),ttConn=document.getElementById('tt-conn');
+const ttCat=document.getElementById('tt-cat'),ttName=document.getElementById('tt-name'),ttMeta=document.getElementById('tt-meta');
+
 nodeG
   .on('mouseenter',function(event,d){
-    const col=CC[d.cat],conn=new Set([d.id,...adj[d.id]]);
-    linkEls.classed('active',l=>l.source.id===d.id||l.target.id===d.id)
-           .classed('dimmed',l=>l.source.id!==d.id&&l.target.id!==d.id)
-           .style('stroke',l=>(l.source.id===d.id||l.target.id===d.id)?col:null);
-    nodeG.classed('dimmed',n=>!conn.has(n.id));
+    if(selectedId===d.id)return;
+    highlightNode(d);
+    const col=CC[d.cat];
     ttCat.textContent=d.cat;ttCat.style.color=col;
     ttName.textContent=d.name;ttName.style.color=col;
-    ttDiff.textContent='● '+d.diff;
-    ttConn.textContent='Connects to: '+adj[d.id].map(id=>nodes[id].short).join(' · ');
+    ttMeta.textContent=`${d.diff} · ${d.degree} connections`;
     tip.classList.add('show');
   })
   .on('mousemove',function(event){
-    const pad=18,tw=260;
-    let x=event.clientX+pad,y=event.clientY-24;
+    const pad=16,tw=215;
+    let x=event.clientX+pad,y=event.clientY-10;
     if(x+tw>W)x=event.clientX-tw-pad;
-    if(y<10)y=10;
+    if(panelOpen)x=Math.min(x,W-320-tw-8);
+    if(y<58)y=58;
     tip.style.left=x+'px';tip.style.top=y+'px';
   })
-  .on('mouseleave',function(){
-    linkEls.classed('active',false).classed('dimmed',false).style('stroke',null);
-    nodeG.classed('dimmed',false);
+  .on('mouseleave',function(event,d){
+    if(selectedId===d.id)return;
+    if(!searchTerm)clearHighlight();
     tip.classList.remove('show');
   })
   .on('click',function(event,d){
     event.stopPropagation();
-    d3.select(this).append('circle').attr('r',22).attr('fill','none')
-      .attr('stroke',CC[d.cat]).attr('stroke-width',2).style('pointer-events','none')
-      .transition().duration(550).ease(d3.easeQuadOut).attr('r',55).style('opacity',0).remove();
-    window.open(d.url,'_blank');
+    tip.classList.remove('show');
+    selectNode(d);
+  })
+  .on('dblclick',function(event,d){
+    event.stopPropagation();
+    d.pinned=!d.pinned;
+    if(d.pinned){d.fx=d.x;d.fy=d.y}else{d.fx=null;d.fy=null}
+    d3.select(this).select('.pin-indicator').text(d.pinned?'📍':'');
   });
-sim.on('tick',()=>{
-  linkEls.attr('x1',d=>d.source.x).attr('y1',d=>d.source.y).attr('x2',d=>d.target.x).attr('y2',d=>d.target.y);
-  nodeG.attr('transform',d=>`translate(${d.x},${d.y})`);
+
+svg.on('click',()=>{if(selectedId!==null)closePanel()});
+
+// ── HIGHLIGHT ──────────────────────────────────────────────────────────
+function highlightNode(d,persist){
+  const connected=new Set([d.id,...adj[d.id]]);
+  linkEls.classed('active',l=>l.source.id===d.id||l.target.id===d.id)
+         .classed('dimmed',l=>l.source.id!==d.id&&l.target.id!==d.id)
+         .style('stroke',l=>(l.source.id===d.id||l.target.id===d.id)?CC[d.cat]:null);
+  nodeG.classed('dimmed',n=>!connected.has(n.id));
+}
+function clearHighlight(){
+  if(selectedId!==null)return;
+  linkEls.classed('active',false).classed('dimmed',false).style('stroke',null);
+  nodeG.classed('dimmed',false);
+}
+
+// ── PANEL ──────────────────────────────────────────────────────────────
+function selectNode(d){
+  selectedId=d.id;highlightNode(d,true);
+  nodeG.classed('selected',n=>n.id===d.id);
+  openPanel(d);
+}
+function openPanel(d){
+  const col=CC[d.cat];
+  document.getElementById('panel-cat').textContent=d.cat;
+  document.getElementById('panel-cat').style.color=col;
+  document.getElementById('panel-name').textContent=d.name;
+  document.getElementById('panel-name').style.color=col;
+  const dEl=document.getElementById('panel-diff');
+  dEl.textContent=d.diff;dEl.className='';dEl.classList.add(d.diff);
+  document.getElementById('panel-desc').textContent=d.desc;
+  document.getElementById('panel-cta').href=d.url;
+  const list=document.getElementById('panel-conn-list');list.innerHTML='';
+  adj[d.id].forEach(cid=>{
+    const cn=nodes[cid];
+    const item=document.createElement('div');item.className='conn-item';
+    item.innerHTML=`<div class="conn-dot" style="background:${CC[cn.cat]};box-shadow:0 0 5px ${CC[cn.cat]}55"></div><span class="conn-name">${cn.short}</span><span class="conn-arrow">→</span>`;
+    item.addEventListener('click',e=>{e.stopPropagation();selectNode(cn);focusNode(cn)});
+    list.appendChild(item);
+  });
+  panelOpen=true;document.getElementById('panel').classList.add('open');
+}
+function closePanel(){
+  selectedId=null;panelOpen=false;
+  document.getElementById('panel').classList.remove('open');
+  nodeG.classed('selected',false);
+  if(!searchTerm)clearHighlight();
+}
+document.getElementById('panel-close').addEventListener('click',closePanel);
+function focusNode(d){
+  const t=d3.zoomTransform(svg.node());
+  const cx=W/2-(panelOpen?155:0),cy=H/2;
+  svg.transition().duration(600).ease(d3.easeCubicInOut)
+    .call(zoom.transform,d3.zoomIdentity.translate(cx-t.k*d.x,cy-t.k*d.y).scale(t.k));
+}
+
+// ── CATEGORY FILTERS ───────────────────────────────────────────────────
+const filtersEl=document.getElementById('cat-filters');
+CATS.forEach(cat=>{
+  const btn=document.createElement('div');
+  btn.className='cat-btn active';btn.dataset.cat=cat;
+  btn.innerHTML=`<div class="cat-dot" style="background:${CC[cat]}"></div>${cat}`;
+  btn.style.borderColor=CC[cat]+'44';btn.style.color=CC[cat];
+  btn.addEventListener('click',()=>{
+    if(activeCategories.has(cat)){
+      if(activeCategories.size===1)return;
+      activeCategories.delete(cat);btn.classList.remove('active');btn.classList.add('inactive');
+    }else{
+      activeCategories.add(cat);btn.classList.remove('inactive');btn.classList.add('active');
+    }
+    applyFilters();
+  });
+  filtersEl.appendChild(btn);
 });
-sim.on('end',()=>{
-  const bb=g.node().getBBox(),pad=90;
-  const sc=Math.min((W-pad*2)/bb.width,(H-pad*2)/bb.height,0.95);
+
+function applyFilters(){
+  nodeG.each(function(d){
+    const vis=activeCategories.has(d.cat)&&(!searchTerm||d.name.toLowerCase().includes(searchTerm)||d.cat.toLowerCase().includes(searchTerm)||d.desc.toLowerCase().includes(searchTerm));
+    d3.select(this).style('display',vis?null:'none');
+  });
+  linkEls.style('display',l=>{
+    const s=typeof l.source==='object'?l.source:nodes[l.source];
+    const t=typeof l.target==='object'?l.target:nodes[l.target];
+    return activeCategories.has(s.cat)&&activeCategories.has(t.cat)?null:'none';
+  });
+}
+
+// ── SEARCH ─────────────────────────────────────────────────────────────
+const searchEl=document.getElementById('search');
+const clearEl=document.getElementById('sc');
+searchEl.addEventListener('input',function(){
+  searchTerm=this.value.toLowerCase().trim();
+  clearEl.style.display=searchTerm?'block':'none';
+  applyFilters();
+  if(searchTerm){
+    nodeG.each(function(d){
+      if(!activeCategories.has(d.cat))return;
+      const match=d.name.toLowerCase().includes(searchTerm)||d.cat.toLowerCase().includes(searchTerm)||d.desc.toLowerCase().includes(searchTerm);
+      d3.select(this).classed('dimmed',!match);
+    });
+    linkEls.classed('dimmed',true);
+  }else{
+    nodeG.classed('dimmed',false);linkEls.classed('dimmed',false);
+  }
+});
+clearEl.addEventListener('click',()=>{searchEl.value='';searchTerm='';clearEl.style.display='none';applyFilters();nodeG.classed('dimmed',false);linkEls.classed('dimmed',false)});
+
+// ── ZOOM CONTROLS ──────────────────────────────────────────────────────
+document.getElementById('z-in').addEventListener('click',()=>svg.transition().duration(300).call(zoom.scaleBy,1.4));
+document.getElementById('z-out').addEventListener('click',()=>svg.transition().duration(300).call(zoom.scaleBy,0.7));
+document.getElementById('z-fit').addEventListener('click',fitScreen);
+
+function fitScreen(){
+  const bb=g.node().getBBox();
+  if(!bb.width)return;
+  const pad=80,sc=Math.min((W-pad*2)/bb.width,(H-pad*2)/bb.height,0.9);
   const tx=(W-sc*(bb.x*2+bb.width))/2,ty=(H-sc*(bb.y*2+bb.height))/2;
-  svg.transition().duration(1000).ease(d3.easeCubicInOut)
+  svg.transition().duration(900).ease(d3.easeCubicInOut)
     .call(zoom.transform,d3.zoomIdentity.translate(tx,ty).scale(sc));
+}
+
+// ── KEYBOARD ───────────────────────────────────────────────────────────
+document.addEventListener('keydown',e=>{
+  if(e.target===searchEl)return;
+  if(e.key==='Escape'){if(panelOpen)closePanel();else if(searchTerm){searchEl.value='';searchEl.dispatchEvent(new Event('input'))}}
+  if(e.key==='f'||e.key==='F')fitScreen();
+  if(e.key==='+'||e.key==='=')svg.transition().duration(300).call(zoom.scaleBy,1.3);
+  if(e.key==='-')svg.transition().duration(300).call(zoom.scaleBy,0.75);
 });
+
+// ── RESIZE ─────────────────────────────────────────────────────────────
 window.addEventListener('resize',()=>{
-  W=window.innerWidth;H=window.innerHeight;
+  W=window.innerWidth;H=window.innerHeight-54;
   svg.attr('width',W).attr('height',H);
-  sim.force('center',d3.forceCenter(W/2,H/2)).alpha(0.3).restart();
+  sim.force('center',d3.forceCenter(W/2,H/2)).alpha(0.2).restart();
 });
 </script>
 </body>
